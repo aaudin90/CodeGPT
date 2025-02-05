@@ -9,19 +9,18 @@ import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPasswordField
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.components.BorderLayoutPanel
 import ee.carlrobert.codegpt.CodeGPTBundle
 import ee.carlrobert.codegpt.credentials.CredentialsStore.CredentialKey
 import ee.carlrobert.codegpt.credentials.CredentialsStore.getCredential
 import ee.carlrobert.codegpt.settings.service.custom.*
-import ee.carlrobert.codegpt.settings.service.custom.form.model.CustomServiceSettingsData
 import ee.carlrobert.codegpt.settings.service.custom.form.model.mapToData
 import ee.carlrobert.codegpt.settings.service.custom.template.CustomServiceTemplate
 import ee.carlrobert.codegpt.ui.UIUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -52,12 +51,15 @@ class CustomServiceListForm(
             selectionMode = ListSelectionModel.SINGLE_SELECTION
 
             addListSelectionListener { _ ->
-                if (selectedIndex == -1) return@addListSelectionListener
-                updateStateFromForm(lastSelectedIndex)
+                val localSelectedIndex = selectedIndex
+                if (localSelectedIndex != -1) {
+                    if (lastSelectedIndex != -1) {
+                        updateStateFromForm(lastSelectedIndex)
+                    }
 
-                lastSelectedIndex = selectedIndex
-                val selectedItem = formState.value.services[lastSelectedIndex]
-                updateFormData(selectedItem)
+                    lastSelectedIndex = localSelectedIndex
+                    updateFormData(lastSelectedIndex)
+                }
             }
         }
 
@@ -71,6 +73,9 @@ class CustomServiceListForm(
     }
 
     private val apiKeyField = JBPasswordField().apply {
+        columns = 30
+    }
+    private val nameField = JBTextField().apply {
         columns = 30
     }
     private val templateHelpText = JBLabel(General.ContextHelp)
@@ -92,6 +97,7 @@ class CustomServiceListForm(
             add(CodeGPTBundle.get("shared.codeCompletions"), codeCompletionsForm.form)
             templateComboBox.selectedItem = selectedItem.template
         }
+        nameField.text = selectedItem.name
         templateComboBox.addItemListener {
             val template = it.item as CustomServiceTemplate
             updateTemplateHelpTextTooltip(template)
@@ -116,7 +122,9 @@ class CustomServiceListForm(
         updateTemplateHelpTextTooltip(selectedItem.template)
     }
 
-    private fun updateFormData(selectedItem: CustomServiceSettingsData) {
+    private fun updateFormData(index: Int) {
+        val selectedItem = formState.value.services[index]
+
         chatCompletionsForm.apply {
             val chatCompletionSettings = selectedItem.chatCompletionSettings
             url = chatCompletionSettings.url.orEmpty()
@@ -132,6 +140,7 @@ class CustomServiceListForm(
             codeCompletionsEnabled = codeCompletionSettings.codeCompletionsEnabled
             parseResponseAsChatCompletions = codeCompletionSettings.parseResponseAsChatCompletions
         }
+        nameField.text = selectedItem.name
         updateTemplateHelpTextTooltip(selectedItem.template)
     }
 
@@ -140,6 +149,7 @@ class CustomServiceListForm(
             val editedItem = state.services[editedIndex]
 
             val updatedItem = editedItem.copy(
+                name = nameField.text,
                 template = templateComboBox.item,
                 chatCompletionSettings = editedItem.chatCompletionSettings.copy(
                     url = chatCompletionsForm.url,
@@ -166,10 +176,6 @@ class CustomServiceListForm(
         }
     }
 
-    fun dispose() {
-        coroutineScope.cancel()
-    }
-
     fun getForm(): JPanel =
         BorderLayoutPanel(8, 0)
             .addToLeft(createToolbarDecorator().createPanel())
@@ -183,24 +189,6 @@ class CustomServiceListForm(
             .setRemoveActionUpdater {
                 formState.value.services.size > 1
             }
-//            .addExtraAction(object :
-//                AnAction("Duplicate", "Duplicate prompt", AllIcons.Actions.Copy) {
-//
-//                override fun getActionUpdateThread(): ActionUpdateThread {
-//                    return ActionUpdateThread.EDT
-//                }
-//
-//                override fun update(e: AnActionEvent) {
-//                    val selectedNode = tree.selectionPath?.lastPathComponent
-//
-//                    e.presentation.isEnabled =
-//                        selectedNode is PromptDetailsTreeNode && selectedNode.category != PromptCategory.CORE_ACTIONS
-//                }
-//
-//                override fun actionPerformed(e: AnActionEvent) {
-//                    handleDuplicateAction()
-//                }
-//            })
             .disableUpDownActions()
 
     private fun handleRemoveAction() {
@@ -210,11 +198,14 @@ class CustomServiceListForm(
                 index != customProvidersJBList.selectedIndex
             })
         }
-        customProvidersJBList.selectedIndex = if (prevSelectedIndex == 0) {
+        val newSelectedIndex = if (prevSelectedIndex == 0) {
             0
         } else {
             prevSelectedIndex - 1
         }
+        lastSelectedIndex = -1
+        updateFormData(newSelectedIndex)
+        customProvidersJBList.selectedIndex = newSelectedIndex
     }
 
     private fun handleAddAction() {
@@ -234,6 +225,10 @@ class CustomServiceListForm(
                 add(Box.createHorizontalStrut(8))
                 add(templateHelpText)
             }
+        )
+        .addLabeledComponent(
+            CodeGPTBundle.get("settingsConfigurable.service.custom.openai.apiKey.provider.name"),
+            nameField
         )
         .addLabeledComponent(
             CodeGPTBundle.get("settingsConfigurable.shared.apiKey.label"),
