@@ -33,15 +33,43 @@ object CredentialsStore {
 
     fun isCredentialSet(key: CredentialKey): Boolean = !getCredential(key).isNullOrEmpty()
 
-    enum class CredentialKey(val value: String = "") {
-        CODEGPT_API_KEY,
-        OPENAI_API_KEY,
-        CUSTOM_SERVICE_API_KEY,
-        ANTHROPIC_API_KEY,
-        AZURE_OPENAI_API_KEY,
-        AZURE_ACTIVE_DIRECTORY_TOKEN,
-        LLAMA_API_KEY,
-        GOOGLE_API_KEY,
-        OLLAMA_API_KEY,
+    sealed class CredentialKey {
+        abstract val name: String
+
+        data object CodeGptApiKey : CredentialKey() {
+            override val name: String = "CODEGPT_API_KEY"
+        }
+
+        data object OpenaiApiKey : CredentialKey() {
+            override val name: String = "OPENAI_API_KEY"
+        }
+
+        data object CustomServiceApiKey : CredentialKey() {
+            override val name: String = "CUSTOM_SERVICE_API_KEY"
+        }
+
+        data object AnthropicApiKey : CredentialKey() {
+            override val name: String = "ANTHROPIC_API_KEY"
+        }
+
+        data object AzureOpenaiApiKey : CredentialKey() {
+            override val name: String = "AZURE_OPENAI_API_KEY"
+        }
+
+        data object AzureActiveDirectoryToken : CredentialKey() {
+            override val name: String = "AZURE_ACTIVE_DIRECTORY_TOKEN"
+        }
+
+        data object LlamaApiKey : CredentialKey() {
+            override val name: String = "LLAMA_API_KEY"
+        }
+
+        data object GoogleApiKey : CredentialKey() {
+            override val name: String = "GOOGLE_API_KEY"
+        }
+
+        data object OllamaApikey : CredentialKey() {
+            override val name: String = "OLLAMA_API_KEY"
+        }
     }
 }
