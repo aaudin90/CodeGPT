@@ -3,6 +3,7 @@ package ee.carlrobert.codegpt.settings.service.custom
 import com.intellij.openapi.components.*
 import com.intellij.util.xmlb.annotations.OptionTag
 import ee.carlrobert.codegpt.codecompletions.InfillPromptTemplate
+import ee.carlrobert.codegpt.credentials.CredentialsStore
 import ee.carlrobert.codegpt.settings.service.custom.template.CustomServiceChatCompletionTemplate
 import ee.carlrobert.codegpt.settings.service.custom.template.CustomServiceCodeCompletionTemplate
 import ee.carlrobert.codegpt.settings.service.custom.template.CustomServiceTemplate
@@ -49,17 +50,33 @@ class CustomServicesSettings :
     override fun initializeComponent() {
         super.initializeComponent()
         val oldSettingsService = serviceOrNull<CustomServiceSettings>()
-        if (oldSettingsService != null && !oldSettingsService.state.isEqualToDefault()) {
+
+        // This line checks if the legacy API key exists to determine if migration of old settings is needed
+        val oldApiKey = CredentialsStore.getCredential(CredentialsStore.CredentialKey.CustomServiceApiKeyLegacy)
+
+        if (oldSettingsService != null && oldApiKey != null) {
             val migrated = CustomServiceSettingsState().apply { copyFrom(oldSettingsService.state) }
             state.services.clear()
             state.services.add(migrated)
             state.active = migrated
 
+            CredentialsStore.setCredential(CredentialsStore.CredentialKey.CustomServiceApiKeyLegacy, null)
+
             oldSettingsService.state.apply {
-                val default = CustomServiceSettingsState()
-                template = default.template
-                chatCompletionSettings = default.chatCompletionSettings
-                codeCompletionSettings = default.codeCompletionSettings
+                template = CustomServiceTemplate.OPENAI
+                chatCompletionSettings = chatCompletionSettings.apply {
+                    url = ""
+                    headers = mutableMapOf()
+                    body = mutableMapOf()
+                }
+                codeCompletionSettings = codeCompletionSettings.apply {
+                    codeCompletionsEnabled = false
+                    parseResponseAsChatCompletions = false
+                    infillTemplate = InfillPromptTemplate.OPENAI
+                    url = ""
+                    headers = mutableMapOf()
+                    body = mutableMapOf()
+                }
                 url = null
                 body = mutableMapOf()
                 headers = mutableMapOf()
